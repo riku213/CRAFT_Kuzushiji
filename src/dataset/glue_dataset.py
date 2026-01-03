@@ -12,7 +12,7 @@ import os
 # ...existing code...
 from torch.utils.data import Dataset, DataLoader
 
-class ClusteringDataset(Dataset):
+class GlueDataset(Dataset):
     def get_folders(self, target_dir):
         # ディレクトリだけを抽出
         folders = [
@@ -236,31 +236,31 @@ test_docs = [
     '200021869'
 ]
 
-# # データセットとデータローダの作成例
-# train_dataset = KuzushijiCanvasDataset(
-#     root_dir=target_dir,
-#     canvas_width=2048,
-#     transform=None,  # ここに正規化などを入れてもよい
-#     test_mode=False,
-#     test_docs=test_docs
-# )
-# test_dataset = KuzushijiCanvasDataset(
-#     root_dir=target_dir,
-#     canvas_width=2048,
-#     transform=None,  # ここに正規化などを入れてもよい
-#     test_mode=True,
-#     test_docs=test_docs
-# )
+# データセットとデータローダの作成例
+train_dataset = KuzushijiCanvasDataset(
+    root_dir=target_dir,
+    canvas_width=2048,
+    transform=None,  # ここに正規化などを入れてもよい
+    test_mode=False,
+    test_docs=test_docs
+)
+test_dataset = KuzushijiCanvasDataset(
+    root_dir=target_dir,
+    canvas_width=2048,
+    transform=None,  # ここに正規化などを入れてもよい
+    test_mode=True,
+    test_docs=test_docs
+)
 
-# train_dataloader = DataLoader(
-#     train_dataset,
-#     batch_size=1,
-#     shuffle=True,
-#     num_workers=0  # Windows なら最初は 0 推奨
-# )
-# test_dataloader = DataLoader(
-#     test_dataset,
-#     batch_size=1,
-#     shuffle=False,
-#     num_workers=0  # Windows なら最初は 0 推奨
-# )
+train_dataloader = DataLoader(
+    train_dataset,
+    batch_size=1,
+    shuffle=True,
+    num_workers=0  # Windows なら最初は 0 推奨
+)
+test_dataloader = DataLoader(
+    test_dataset,
+    batch_size=1,
+    shuffle=False,
+    num_workers=0  # Windows なら最初は 0 推奨
+)
