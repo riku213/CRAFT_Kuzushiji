@@ -3,6 +3,7 @@ from pathlib import Path
 sys.path.append(str(Path().resolve().parent))
 from src.dataset.clustering_dataset import ClusteringDataset
 import torch
+from tqdm import tqdm
 
 # 例: Notebook / スクリプト側
 import sys
@@ -213,7 +214,7 @@ def find_latest_checkpoint(ckpt_dir: str) -> str | None:
 ckpt_dir = "checkpoints_PatchTransformerSep_Clustering"
 os.makedirs(ckpt_dir, exist_ok=True)
 
-num_epochs = 5
+num_epochs = 100
 save_every_steps = 200
 history = {"train_loss": []}
 
