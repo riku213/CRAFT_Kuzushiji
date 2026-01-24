@@ -11,8 +11,8 @@ sys.path.append(str(Path().resolve().parent))
 from src.dataset.clustering_dataset import ClusteringDataset, UnicodeClassMapper
 from torch.utils.data import DataLoader
 
-root_dir = r"C:\Users\kotat\MyPrograms\MyKuzushiji\kuzushiji-recognition\char_sep_datas"
-# root_dir = r"/scratch/users/grad/2025/25t0024/programs/MyKuzushiji/kuzushiji-recognition/char_sep_datas"
+# root_dir = r"C:\Users\kotat\MyPrograms\MyKuzushiji\kuzushiji-recognition\char_sep_datas"
+root_dir = r"/scratch/users/grad/2025/25t0024/programs/MyKuzushiji/kuzushiji-recognition/char_sep_datas"
 
 test_docs = [
     "200021637","100249371","100249537","200005598",
