@@ -153,6 +153,7 @@ import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+print('モデル生成')
 C = train_ds.mapper.num_classes  # ★ClusteringDatasetのクラス次元
 model = PatchTransformerSep(
     img_channels=3,
@@ -257,13 +258,14 @@ else:
     print("no checkpoint found. start from scratch.")
     resume_epoch = 1
     resume_step_in_epoch = 0
-
+print('学習開始')
 model.train()
 for epoch in range(resume_epoch, num_epochs + 1):
+    print(f'=== epoch {epoch} ===')
     running = 0.0
     n = 0
-
     for step, batch in enumerate(loader, start=1):
+        print(f'epoch {epoch} step {step}')
         if epoch == resume_epoch and resume_step_in_epoch > 0 and step <= resume_step_in_epoch:
             continue  # 途中までやった分を飛ばす
 
