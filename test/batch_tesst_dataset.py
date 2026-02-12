@@ -154,6 +154,32 @@ import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def bce_onehot_with_background(
+    logits_bchw: torch.Tensor,
+    target_bchw: torch.Tensor,
+    bg_weight: float = 0.05,   # 背景の重み（0<bg_weight<=1）。小さくするほど背景の影響を弱める
+) -> torch.Tensor:
+    """
+    target: one-hot (B,C,H,W)
+      - 文字(ラベルあり)画素: どれか1チャネルが1（想定）
+      - 背景画素: 全チャネル0（重要）
+    """
+    # (B,1,H,W) 背景=1, 前景=0
+    is_bg = (target_bchw.sum(dim=1, keepdim=True) == 0).float()
+    is_fg = 1.0 - is_bg
+
+    # (B,1,H,W) の画素重み（Cへbroadcastされる）
+    w = is_fg + bg_weight * is_bg
+
+    loss_map = F.binary_cross_entropy_with_logits(
+        logits_bchw, target_bchw, reduction="none"
+    )  # (B,C,H,W)
+
+    loss_map = loss_map * w
+
+    denom = (w.sum() * logits_bchw.size(1)).clamp_min(1.0)
+    return loss_map.sum() / denom
+
 print('モデル生成')
 C = train_ds.mapper.num_classes  # ★ClusteringDatasetのクラス次元
 model = PatchTransformerSep(
@@ -275,7 +301,7 @@ for epoch in range(resume_epoch, num_epochs + 1):
         target = label_map.permute(0, 3, 1, 2).float().contiguous()
 
         logits = model(img)
-        loss = masked_bce_onehot_loss(logits, target)
+        loss = bce_onehot_with_background(logits, target)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
