@@ -650,7 +650,7 @@ for epoch in range(1, num_epochs + 1):
 
     for batch in train_loader:
         img = batch["image"].to(device, non_blocking=True)  # (B,3,H,W)
-        mask = batch["text_region"].to(device, non_blocking=True).unsqueeze(1)  # (B,1,H,W)
+        mask = batch["affinity_mask"].to(device, non_blocking=True).unsqueeze(1)  # (B,1,H,W)
 
         optimizer.zero_grad(set_to_none=True)
 
