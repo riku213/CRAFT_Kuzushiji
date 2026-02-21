@@ -433,7 +433,8 @@ class ClusteringDataset1_2(Dataset):
             },
         }
 
-root_dir = r"C:\Users\kotat\MyPrograms\MyKuzushiji\kuzushiji-recognition\char_sep_datas"
+# root_dir = r"C:\Users\kotat\MyPrograms\MyKuzushiji\kuzushiji-recognition\char_sep_datas"
+root_dir = r"/scratch/users/grad/2025/25t0024/programs/MyKuzushiji/kuzushiji-recognition/char_sep_datas"
 
 test_docs = [
     "200021637","100249371","100249537","200005598",
@@ -610,7 +611,7 @@ scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 # -------------------------
 # Checkpoint settings
 # -------------------------
-ckpt_dir = Path(r"c:\Users\kotat\MyPrograms\MyKuzushiji\Glue_Craft\test\checkpoints1_2")
+ckpt_dir = Path(r".\checkpoints1_2")
 ckpt_dir.mkdir(parents=True, exist_ok=True)
 
 num_epochs = 100
