@@ -606,7 +606,8 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
 
 # AMP（CUDAのときだけ有効）
 use_amp = torch.cuda.is_available()
-scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+amp_device = "cuda" if use_amp else "cpu"
+scaler = torch.amp.GradScaler(amp_device, enabled=use_amp)
 
 # -------------------------
 # Checkpoint settings
@@ -655,7 +656,7 @@ for epoch in range(1, num_epochs + 1):
 
         optimizer.zero_grad(set_to_none=True)
 
-        with torch.cuda.amp.autocast(enabled=use_amp):
+        with torch.amp.autocast(device_type=amp_device, enabled=use_amp):
             logits = model(img)  # (B,1,H,W)
             loss = _bce_text_region_loss(logits, mask)
 
@@ -675,13 +676,13 @@ for epoch in range(1, num_epochs + 1):
     model.eval()
     test_loss_sum = 0.0
     test_count = 0
-
+    
     with torch.no_grad():
         for batch in test_loader:
             img = batch["image"].to(device, non_blocking=True)
             mask = batch["text_region"].to(device, non_blocking=True).unsqueeze(1)
 
-            with torch.cuda.amp.autocast(enabled=use_amp):
+            with torch.amp.autocast(device_type=amp_device, enabled=use_amp):
                 logits = model(img)
                 loss = _bce_text_region_loss(logits, mask)
 
