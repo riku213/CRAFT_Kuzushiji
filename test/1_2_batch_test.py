@@ -619,6 +619,43 @@ num_epochs = 100
 best_test_loss = float("inf")
 history = {"train_loss": [], "test_loss": []}
 
+def _find_latest_ckpt(path: Path) -> Optional[Path]:
+    candidates = list(path.glob("patch_transformer_sep_epoch*.pth"))
+    if not candidates:
+        return None
+
+    def _epoch_num(p: Path) -> int:
+        stem = p.stem
+        try:
+            return int(stem.split("epoch")[-1])
+        except ValueError:
+            return -1
+
+    candidates.sort(key=_epoch_num)
+    return candidates[-1]
+
+# -------------------------
+# Resume from checkpoint (if exists)
+# -------------------------
+start_epoch = 1
+resume_path = ckpt_dir / "patch_transformer_sep_last.pth"
+if not resume_path.exists():
+    latest = _find_latest_ckpt(ckpt_dir)
+    if latest is not None:
+        resume_path = latest
+
+if resume_path.exists():
+    ckpt = torch.load(resume_path, map_location=device)
+    model.load_state_dict(ckpt.get("model_state_dict", {}), strict=True)
+    optimizer.load_state_dict(ckpt.get("optimizer_state_dict", {}))
+    if "scaler_state_dict" in ckpt:
+        scaler.load_state_dict(ckpt["scaler_state_dict"])
+
+    start_epoch = int(ckpt.get("epoch", 0)) + 1
+    best_test_loss = float(ckpt.get("best_test_loss", best_test_loss))
+    history = ckpt.get("history", history)
+    print(f"[resume] loaded {resume_path} (start_epoch={start_epoch})")
+
 def _bce_text_region_loss(
     logits: torch.Tensor,
     target_mask: torch.Tensor,
@@ -642,7 +679,7 @@ def _bce_text_region_loss(
     denom = w.sum().clamp_min(1.0)
     return loss_map.sum() / denom
 
-for epoch in range(1, num_epochs + 1):
+for epoch in range(start_epoch, num_epochs + 1):
     # -------------------------
     # Train
     # -------------------------
@@ -706,8 +743,10 @@ for epoch in range(1, num_epochs + 1):
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
+            "scaler_state_dict": scaler.state_dict(),
             "train_loss": train_loss,
             "test_loss": test_loss,
+            "best_test_loss": best_test_loss,
             "history": history,
             "config": {
                 "num_classes": 1,
@@ -720,6 +759,22 @@ for epoch in range(1, num_epochs + 1):
         ckpt_path,
     )
 
+    # Last checkpoint (for resume)
+    last_path = ckpt_dir / "patch_transformer_sep_last.pth"
+    torch.save(
+        {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scaler_state_dict": scaler.state_dict(),
+            "train_loss": train_loss,
+            "test_loss": test_loss,
+            "best_test_loss": best_test_loss,
+            "history": history,
+        },
+        last_path,
+    )
+
     # Best checkpoint
     if test_loss < best_test_loss:
         best_test_loss = test_loss
@@ -729,8 +784,10 @@ for epoch in range(1, num_epochs + 1):
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
+                "scaler_state_dict": scaler.state_dict(),
                 "train_loss": train_loss,
                 "test_loss": test_loss,
+                "best_test_loss": best_test_loss,
                 "history": history,
             },
             best_path,
