@@ -680,7 +680,7 @@ for epoch in range(1, num_epochs + 1):
     with torch.no_grad():
         for batch in test_loader:
             img = batch["image"].to(device, non_blocking=True)
-            mask = batch["text_region"].to(device, non_blocking=True).unsqueeze(1)
+            mask = batch["affinity_mask"].to(device, non_blocking=True).unsqueeze(1)
 
             with torch.amp.autocast(device_type=amp_device, enabled=use_amp):
                 logits = model(img)
