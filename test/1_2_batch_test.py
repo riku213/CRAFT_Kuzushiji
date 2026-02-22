@@ -403,9 +403,18 @@ class ClusteringDataset1_2(Dataset):
 
         # print(f'check : {ann_df_s}')
 
-        # # マスク生成
+        # # マスク生成（affinityはキャッシュ）
         # text_region_mask = make_text_region_mask(ann_df_s, H=H, W=W)
-        affinity_mask = make_affinity_mask(ann_df_s, H=H, W=W, expand_ratio_y=0.2)
+        cache_dir = os.path.join(self.root_dir, doc_id, "1_2_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_name = f"{image_id}_cw{self.canvas_width}_ps{self.patch_size}_er0p2.pt"
+        cache_path = os.path.join(cache_dir, cache_name)
+
+        if os.path.exists(cache_path):
+            affinity_mask = torch.load(cache_path, map_location="cpu")
+        else:
+            affinity_mask = make_affinity_mask(ann_df_s, H=H, W=W, expand_ratio_y=0.2)
+            torch.save(affinity_mask, cache_path)
         # final_text_mask = make_final_text_mask(text_region_mask, affinity_mask)
 
         # # one-hot ラベル
