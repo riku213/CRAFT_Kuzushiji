@@ -612,7 +612,7 @@ scaler = torch.amp.GradScaler(amp_device, enabled=use_amp)
 # -------------------------
 # Checkpoint settings
 # -------------------------
-ckpt_dir = Path(r".\checkpoints1_2")
+ckpt_dir = Path(r"checkpoints1_2")
 ckpt_dir.mkdir(parents=True, exist_ok=True)
 
 num_epochs = 100
