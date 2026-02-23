@@ -410,7 +410,13 @@ class ClusteringDataset1_3(Dataset):
         cache_path = os.path.join(cache_dir, cache_name)
 
         if os.path.exists(cache_path):
-            final_text_mask = torch.load(cache_path, map_location="cpu")
+            try:
+                final_text_mask = torch.load(
+                    cache_path, map_location="cpu", weights_only=True
+                )
+            except TypeError:
+                # older torch without weights_only
+                final_text_mask = torch.load(cache_path, map_location="cpu")
         else:
             text_region_mask = make_text_region_mask(ann_df_s, H=H, W=W)
             affinity_mask = make_affinity_mask(ann_df_s, H=H, W=W, expand_ratio_y=0.2)
