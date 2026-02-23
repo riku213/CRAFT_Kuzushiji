@@ -246,6 +246,11 @@ def make_one_hot_char_label_map(
         w = int(row[w_col])
         h = int(row[h_col])
         cls = mapper.to_class_id(row.get(unicode_col, None))
+        if cls is None:
+            continue
+        if cls < 0 or cls >= C:
+            # 未知クラスはスキップ（クラス数固定のため）
+            continue
 
         x1, y1 = x, y
         x2, y2 = x + w, y + h
