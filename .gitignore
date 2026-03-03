@@ -1,4 +1,10 @@
 test/checkpoints/
 test/checkpoints1_1/
+test/checkpoints1_2/
+test/checkpoints1_3/
+test/checkpoints_UNet_1_1/
+test/result_1_1/
+test/result_1_2/
+test/result_1_3/
 test/checkpoints_PatchTransformerSep_Clustering
 .vscode/

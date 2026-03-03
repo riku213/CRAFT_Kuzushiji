@@ -475,69 +475,146 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# class PatchTransformerSep(nn.Module):
+#     def __init__(self, img_channels=3, big_patch_size=256, vit_patch_size=16,
+#                  d_model=256, nhead=8, num_layers=4, num_classes=2):
+#         super().__init__()
+#         self.big_patch_size = big_patch_size     # 256
+#         self.vit_patch_size = vit_patch_size     # 16
+#         self.img_channels = img_channels
+
+#         inner_patch_dim = img_channels * vit_patch_size * vit_patch_size
+#         self.patch_embed = nn.Linear(inner_patch_dim, d_model)
+
+#         max_tokens = (big_patch_size // vit_patch_size) ** 2  # 256
+#         self.pos_embed = nn.Parameter(torch.zeros(1, max_tokens, d_model))
+
+#         encoder_layer = nn.TransformerEncoderLayer(
+#             d_model=d_model, nhead=nhead, batch_first=True
+#         )
+#         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+
+#         # ★ここが「出力層の形」: Cクラスぶん出す
+#         self.head = nn.Conv2d(d_model, num_classes, kernel_size=1)
+
+#     def forward(self, img):
+#         """
+#         img: (B, 3, H, W), H,W は 256 の倍数を想定
+#         return: logits: (B, C, H, W)
+#         """
+#         B, C, H, W = img.shape
+#         P = self.big_patch_size      # 256
+#         p = self.vit_patch_size      # 16
+
+#         assert H % P == 0 and W % P == 0, "H,W は big_patch_size(256) の倍数を想定"
+#         nH_big = H // P
+#         nW_big = W // P
+#         n_big = nH_big * nW_big
+
+#         # 1) 256×256 タイル化
+#         x = img.unfold(2, P, P).unfold(3, P, P)                 # (B,C,nH,nW,P,P)
+#         x = x.permute(0, 2, 3, 1, 4, 5).contiguous()            # (B,nH,nW,C,P,P)
+#         x = x.view(B * n_big, C, P, P)                          # (B*n_big,C,256,256)
+
+#         # 2) タイル内を 16×16 パッチ(=token)化
+#         n_h_inner = P // p                                       # 16
+#         n_w_inner = P // p                                       # 16
+#         N_inner = n_h_inner * n_w_inner                          # 256
+
+#         x = x.unfold(2, p, p).unfold(3, p, p)                    # (B*n_big,C,16,16,p,p)
+#         x = x.contiguous().view(B * n_big, C, N_inner, p * p)    # (B*n_big,C,256,256)
+#         x = x.permute(0, 2, 1, 3).contiguous().view(B * n_big, N_inner, -1)
+
+#         # 3) Transformer
+#         x = self.patch_embed(x)                                  # (B*n_big,256,d_model)
+#         x = x + self.pos_embed[:, :N_inner, :]
+#         x = self.encoder(x)
+
+#         # 4) 16×16 に戻して -> Cクラスlogits -> 256×256へ拡大
+#         x = x.view(B * n_big, n_h_inner, n_w_inner, -1).permute(0, 3, 1, 2).contiguous()
+#         logits_small = self.head(x)                               # (B*n_big,C,16,16)
+#         logits_tile = F.interpolate(logits_small, size=(P, P), mode="bilinear", align_corners=False)
+
+#         # 5) タイルを敷き詰めて (B,C,H,W)
+#         logits_tile = logits_tile.view(B, nH_big, nW_big, -1, P, P)
+#         logits = logits_tile.permute(0, 3, 1, 4, 2, 5).contiguous().view(B, -1, H, W)
+#         return logits
+
+
 class PatchTransformerSep(nn.Module):
-    def __init__(self, img_channels=3, big_patch_size=256, vit_patch_size=16,
-                 d_model=256, nhead=8, num_layers=4, num_classes=2):
+    """
+    4層U-Net (Encoder 4段 + Bottleneck + Decoder 4段)
+    出力: (B, num_classes, H, W)
+    """
+    def __init__(
+        self,
+        img_channels: int = 3,
+        base_channels: int = 64,
+        num_classes: int = 1,
+    ):
         super().__init__()
-        self.big_patch_size = big_patch_size     # 256
-        self.vit_patch_size = vit_patch_size     # 16
-        self.img_channels = img_channels
 
-        inner_patch_dim = img_channels * vit_patch_size * vit_patch_size
-        self.patch_embed = nn.Linear(inner_patch_dim, d_model)
+        def conv_block(in_ch: int, out_ch: int) -> nn.Sequential:
+            return nn.Sequential(
+                nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True),
+            )
 
-        max_tokens = (big_patch_size // vit_patch_size) ** 2  # 256
-        self.pos_embed = nn.Parameter(torch.zeros(1, max_tokens, d_model))
+        self.enc1 = conv_block(img_channels, base_channels)          # 1x
+        self.enc2 = conv_block(base_channels, base_channels * 2)     # 1/2
+        self.enc3 = conv_block(base_channels * 2, base_channels * 4) # 1/4
+        self.enc4 = conv_block(base_channels * 4, base_channels * 8) # 1/8
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=nhead, batch_first=True
-        )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.pool = nn.MaxPool2d(2)
 
-        # ★ここが「出力層の形」: Cクラスぶん出す
-        self.head = nn.Conv2d(d_model, num_classes, kernel_size=1)
+        self.bottleneck = conv_block(base_channels * 8, base_channels * 16)  # 1/16
 
-    def forward(self, img):
-        """
-        img: (B, 3, H, W), H,W は 256 の倍数を想定
-        return: logits: (B, C, H, W)
-        """
-        B, C, H, W = img.shape
-        P = self.big_patch_size      # 256
-        p = self.vit_patch_size      # 16
+        self.up4 = nn.ConvTranspose2d(base_channels * 16, base_channels * 8, kernel_size=2, stride=2)
+        self.dec4 = conv_block(base_channels * 16, base_channels * 8)
 
-        assert H % P == 0 and W % P == 0, "H,W は big_patch_size(256) の倍数を想定"
-        nH_big = H // P
-        nW_big = W // P
-        n_big = nH_big * nW_big
+        self.up3 = nn.ConvTranspose2d(base_channels * 8, base_channels * 4, kernel_size=2, stride=2)
+        self.dec3 = conv_block(base_channels * 8, base_channels * 4)
 
-        # 1) 256×256 タイル化
-        x = img.unfold(2, P, P).unfold(3, P, P)                 # (B,C,nH,nW,P,P)
-        x = x.permute(0, 2, 3, 1, 4, 5).contiguous()            # (B,nH,nW,C,P,P)
-        x = x.view(B * n_big, C, P, P)                          # (B*n_big,C,256,256)
+        self.up2 = nn.ConvTranspose2d(base_channels * 4, base_channels * 2, kernel_size=2, stride=2)
+        self.dec2 = conv_block(base_channels * 4, base_channels * 2)
 
-        # 2) タイル内を 16×16 パッチ(=token)化
-        n_h_inner = P // p                                       # 16
-        n_w_inner = P // p                                       # 16
-        N_inner = n_h_inner * n_w_inner                          # 256
+        self.up1 = nn.ConvTranspose2d(base_channels * 2, base_channels, kernel_size=2, stride=2)
+        self.dec1 = conv_block(base_channels * 2, base_channels)
 
-        x = x.unfold(2, p, p).unfold(3, p, p)                    # (B*n_big,C,16,16,p,p)
-        x = x.contiguous().view(B * n_big, C, N_inner, p * p)    # (B*n_big,C,256,256)
-        x = x.permute(0, 2, 1, 3).contiguous().view(B * n_big, N_inner, -1)
+        self.head = nn.Conv2d(base_channels, num_classes, kernel_size=1)
 
-        # 3) Transformer
-        x = self.patch_embed(x)                                  # (B*n_big,256,d_model)
-        x = x + self.pos_embed[:, :N_inner, :]
-        x = self.encoder(x)
+    def forward(self, img: torch.Tensor) -> torch.Tensor:
+        # Encoder
+        e1 = self.enc1(img)           # (B, C, H, W)
+        e2 = self.enc2(self.pool(e1)) # (B, 2C, H/2, W/2)
+        e3 = self.enc3(self.pool(e2)) # (B, 4C, H/4, W/4)
+        e4 = self.enc4(self.pool(e3)) # (B, 8C, H/8, W/8)
 
-        # 4) 16×16 に戻して -> Cクラスlogits -> 256×256へ拡大
-        x = x.view(B * n_big, n_h_inner, n_w_inner, -1).permute(0, 3, 1, 2).contiguous()
-        logits_small = self.head(x)                               # (B*n_big,C,16,16)
-        logits_tile = F.interpolate(logits_small, size=(P, P), mode="bilinear", align_corners=False)
+        # Bottleneck
+        b = self.bottleneck(self.pool(e4))  # (B, 16C, H/16, W/16)
 
-        # 5) タイルを敷き詰めて (B,C,H,W)
-        logits_tile = logits_tile.view(B, nH_big, nW_big, -1, P, P)
-        logits = logits_tile.permute(0, 3, 1, 4, 2, 5).contiguous().view(B, -1, H, W)
+        # Decoder
+        d4 = self.up4(b)
+        d4 = torch.cat([d4, e4], dim=1)
+        d4 = self.dec4(d4)
+
+        d3 = self.up3(d4)
+        d3 = torch.cat([d3, e3], dim=1)
+        d3 = self.dec3(d3)
+
+        d2 = self.up2(d3)
+        d2 = torch.cat([d2, e2], dim=1)
+        d2 = self.dec2(d2)
+
+        d1 = self.up1(d2)
+        d1 = torch.cat([d1, e1], dim=1)
+        d1 = self.dec1(d1)
+
+        logits = self.head(d1)
         return logits
 
 
@@ -607,15 +684,16 @@ test_loader = DataLoader(
 # -------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = PatchTransformerSep(
-    img_channels=3,
-    big_patch_size=256,
-    vit_patch_size=16,
-    d_model=256,
-    nhead=8,
-    num_layers=4,
-    num_classes=1,   # ★text_region用: 1チャネル出力
-).to(device)
+# model = PatchTransformerSep(
+#     img_channels=3,
+#     big_patch_size=256,
+#     vit_patch_size=16,
+#     d_model=256,
+#     nhead=8,
+#     num_layers=4,
+#     num_classes=1,   # ★text_region用: 1チャネル出力
+# ).to(device)
+model = PatchTransformerSep().to(device)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
 
@@ -627,7 +705,7 @@ scaler = torch.amp.GradScaler(amp_device, enabled=use_amp)
 # -------------------------
 # Checkpoint settings
 # -------------------------
-ckpt_dir = Path(r"checkpoints1_3")
+ckpt_dir = Path(r"checkpoints_UNet_1_3")
 ckpt_dir.mkdir(parents=True, exist_ok=True)
 
 num_epochs = 100
