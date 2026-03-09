@@ -3,8 +3,13 @@ test/checkpoints1_1/
 test/checkpoints1_2/
 test/checkpoints1_3/
 test/checkpoints_UNet_1_1/
+test/checkpoints_UNet_1_2/
+test/checkpoints_UNet_1_3/
 test/result_1_1/
 test/result_1_2/
 test/result_1_3/
+test/result_1_1_UNet/
+test/result_1_2_UNet/
+test/result_1_3_UNet/
 test/checkpoints_PatchTransformerSep_Clustering
 .vscode/

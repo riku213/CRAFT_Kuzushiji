@@ -413,7 +413,7 @@ class ClusteringDataset1_2(Dataset):
         if os.path.exists(cache_path):
             affinity_mask = torch.load(cache_path, map_location="cpu")
         else:
-            affinity_mask = make_affinity_mask(ann_df_s, H=H, W=W, expand_ratio_y=0.2)
+            affinity_mask = make_affinity_mask(ann_df_s, H=H, W=W, expand_ratio_y=0.1)
             torch.save(affinity_mask, cache_path)
         # final_text_mask = make_final_text_mask(text_region_mask, affinity_mask)
 
@@ -703,7 +703,7 @@ scaler = torch.amp.GradScaler(amp_device, enabled=use_amp)
 # -------------------------
 # Checkpoint settings
 # -------------------------
-ckpt_dir = Path(r"checkpoints_UNet_1_2")
+ckpt_dir = Path(r"checkpoints_UNet_1_2_2")
 ckpt_dir.mkdir(parents=True, exist_ok=True)
 
 num_epochs = 100
